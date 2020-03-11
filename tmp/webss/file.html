@@ -1,0 +1,22 @@
+<html>
+	<head>
+		<meta charset="GBK" />
+		<title> {{title}} </title>
+	</head>
+	<body>
+		{% autoescape off %}
+		<h1> {{title}} </h1>
+		<li> {{time}} </li>
+		<p> {{content}} </p>
+		{% for i in links %}
+		<li><a href="{{i.url}}"> {{i.title}} </a></li><br>
+		{% endfor %}
+		{% endautoescape %}
+	</body>
+</html>
+<style>
+body { margin: 30px auto 40px auto; width: 800px; }
+p { line-height:30px }
+li {line-height:25px }
+h1 { line-height:50px; text-align: center; }
+</style>
