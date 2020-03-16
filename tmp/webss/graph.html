@@ -20,11 +20,10 @@ var mark = {{ gexf }};
 {% endautoescape %}
 option = null;
 myChart.showLoading();
-$.get(mark, function (xml) {
+$.get(mark, function (graph) {
     console.log("lalala");
     myChart.hideLoading();
-
-    var graph = echarts.dataTool.gexf.parse(xml);
+    //var graph = echarts.dataTool.gexf.parse(xml);
     var categories = [
         {name : 'self'},
         {name : 'references'},
@@ -32,15 +31,28 @@ $.get(mark, function (xml) {
         {name : 'co-author'}
     ];
     
+   
+    
     graph.nodes.forEach(function (node) {
         node.itemStyle = null;
-        node.value = 10;
-        node.symbolSize = 10;
+        node.value = node.value;
+        node.name = node.label;
+        node.symbolSize = 10 * node.value;
         node.label = {
             show: true
         };
-        node.category = node.attributes[0];
+        node.category = node.modularity_class;
+        node.draggable = true;
     });
+    graph.links.forEach(function(link){
+        link.lineStyle = {
+            width : link.weight * 5
+        };
+    });
+    
+    
+    console.log(graph);
+    
     option = {
         title: {
             text: 'Citation Network',
@@ -49,6 +61,7 @@ $.get(mark, function (xml) {
             left: 'right'
         },
         tooltip: {},
+        color:['#EE6A50','#4F94CD','#003000','#8B658B'],
         legend: [{
             // selectedMode: 'single',
             data: categories.map(function (a) {
@@ -97,7 +110,7 @@ $.get(mark, function (xml) {
     };
 
     myChart.setOption(option);
-}, 'xml');;
+}, 'json');;
 myChart.on('click',function(params){
     console.log(params.data.id);
     window.location.assign("graph_"+params.data.id);
