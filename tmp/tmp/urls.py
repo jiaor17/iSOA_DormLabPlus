@@ -20,8 +20,7 @@ from temp import views
 
 urlpatterns = [
     url(r'^$',views.opens),
-    url(r'^(\d+)$',views.writeweb),
-    url(r'^searchfor(.*?)page(\d+)from(.*?)to(.*?)$',views.searchfor),
     url(r'^graph_(\d+)$',views.writegraph),
-    url(r'^graphs_(\d+)$',views.getgexf)
+    url(r'^graphs_(\d+)$',views.getgexf),
+    url(r'^searchfor(.*?)page(\d+)$',views.search_papers)
 ]

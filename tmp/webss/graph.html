@@ -3,8 +3,20 @@
    <head>
        <meta charset="utf-8">
    </head>
-   <body style="height: 100%; margin: 0">
-       <div id="container" style="height: 100%"></div>
+   <body>
+       {% autoescape off %}
+		<h1> {{title}} </h1>
+		<p> <b>Authors: </b>{{authors}} </p>
+        {% if showAbstract %}
+            <p> <b>Abstract: </b>{{abstract}} </p>
+        {% endif %}
+        {% if showKeywords %}
+            <p> <b>Keywords: </b>{{keywords}} </p>
+        {% endif %}
+        <p> <b>Citation: </b>{{citation}} </p>
+        <p> <b>Year: </b>{{year}} </p>
+		{% endautoescape %}
+       <div id="container" style="height:800px;width:800px;margin:0"></div>
        <script type="text/javascript" src="http://apps.bdimg.com/libs/jquery/1.11.1/jquery.min.js"></script>
        <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/echarts/dist/echarts.min.js"></script>
        <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/echarts-gl/dist/echarts-gl.min.js"></script>
@@ -39,7 +51,7 @@ $.get(mark, function (graph) {
         node.name = node.label;
         node.symbolSize = 10 * node.value;
         node.label = {
-            show: true
+            show: node.value>=0.5
         };
         node.category = node.modularity_class;
         node.draggable = true;
@@ -121,3 +133,9 @@ if (option && typeof option === "object") {
        </script>
    </body>
 </html>
+<style>
+body { margin: 30px auto 40px auto; width: 800px; }
+p { line-height:30px }
+li {line-height:25px }
+h1 { line-height:50px; text-align: center; }
+</style>

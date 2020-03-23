@@ -5,9 +5,7 @@ function changeAction()
   {
   var x=document.getElementById("myForm")
   var y=document.getElementById("myText")
-  var f=document.getElementById("From")
-  var t=document.getElementById("To")
-  x.action="searchfor"+y.value+"page1"+"from"+f.value+"to"+t.value
+  x.action="searchfor"+y.value+"page1"
   x.submit()
   }
 </script>
@@ -17,10 +15,6 @@ function changeAction()
 			<form id="myForm" action="">
             <input id="myText" type="text" name="questions" value="{{que}}">
             <input class="button" onclick="changeAction()" value="Search"><br><br>
-			<b> From </b>
-			<input id="From" type="date" value="{{ft}}" />
-			<b> To </b>
-			<input id="To" type="date" value="{{tt}}" />
 			</form>
         </div>
 </div>
@@ -43,7 +37,8 @@ function changeAction()
 	{% autoescape off %}
 	{% for i in answers %}
 	<a href={{i.website}}> {{i.title}} </a>
-	<p> {{i.content}} </p>
+    <p style='color:green'> {{i.other_message}} </p>
+	<p> {{i.abstract}} </p>
 	{% endfor %}
 	{% endautoescape %}
 </ul>
