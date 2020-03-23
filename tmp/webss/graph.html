@@ -124,8 +124,9 @@ $.get(mark, function (graph) {
     myChart.setOption(option);
 }, 'json');;
 myChart.on('click',function(params){
-    console.log(params.data.id);
-    window.location.assign("graph_"+params.data.id);
+    if(params.dataType == 'node'){
+        window.location.assign("graph_"+params.data.id);
+    }
 });
 if (option && typeof option === "object") {
     myChart.setOption(option, true);
