@@ -192,7 +192,7 @@ wasabi==0.6.0
 wcwidth==0.1.7
 webencodings==0.5.1
 websocket-client==0.56.0
-Werkzeug==0.15.0
+Werkzeug==0.15.3
 widgetsnbextension==3.4.2
 zhusuan==0.3.1
 zict==0.1.4
