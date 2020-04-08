@@ -3,3 +3,4 @@ tmp/data/*
 *idea*
 *checkpoints*
 *pycache*
+*sqlite3*

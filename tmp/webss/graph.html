@@ -17,6 +17,7 @@
         <p> <b>Year: </b>{{year}} </p>
 		{% endautoescape %}
        <div id="container" style="height:800px;width:800px;margin:0"></div>
+       <script type="text/javascript" src="//cdnjs.cloudflare.com/ajax/libs/numeral.js/2.0.6/numeral.min.js"></script>
        <script type="text/javascript" src="http://apps.bdimg.com/libs/jquery/1.11.1/jquery.min.js"></script>
        <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/echarts/dist/echarts.min.js"></script>
        <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/echarts-gl/dist/echarts-gl.min.js"></script>
@@ -47,11 +48,11 @@ $.get(mark, function (graph) {
     
     graph.nodes.forEach(function (node) {
         node.itemStyle = null;
-        node.value = node.value;
+        node.value = node.score;
         node.name = node.label;
-        node.symbolSize = 10 * node.value;
+        node.symbolSize = 10 * node.showValue;
         node.label = {
-            show: node.value>=0.5
+            show: node.showValue>=1.0
         };
         node.category = node.modularity_class;
         node.draggable = true;
@@ -60,6 +61,9 @@ $.get(mark, function (graph) {
         link.lineStyle = {
             width : link.weight * 5
         };
+        link.emphasis = {
+            width : link.weight * 10
+        }
     });
     
     
@@ -72,7 +76,16 @@ $.get(mark, function (graph) {
             top: 'bottom',
             left: 'right'
         },
-        tooltip: {},
+        tooltip: {
+            formatter: function(params, ticket, callback) {
+                if(params.dataType == 'node'){
+                    var relevance = numeral(params.data.relevance).format('0.00');
+                    var impact = numeral(params.data.impact).format('0.00');
+                    var score = numeral(params.data.showValue/1.5).format('0.00');
+                    return params.name + '<br\> relevance : ' + relevance + '<br\> impact : ' + impact + '<br\> score : ' + score;
+                }
+            }
+        },
         color:['#EE6A50','#4F94CD','#003000','#8B658B'],
         legend: [{
             // selectedMode: 'single',
@@ -111,11 +124,6 @@ $.get(mark, function (graph) {
                 lineStyle: {
                     color: 'source',
                     curveness: 0.3
-                },
-                emphasis: {
-                    lineStyle: {
-                        width: 10
-                    }
                 }
             }
         ]

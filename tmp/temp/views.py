@@ -1,11 +1,14 @@
 from django.shortcuts import render
-from django.http import JsonResponse,FileResponse
+from django.http import JsonResponse,FileResponse,HttpResponse
 import pickle
 import networkx as nx
 import json
 import scipy.sparse as sp
 from tqdm import tqdm
 import numpy as np
+import math
+from temp.models import *
+from django.db.models import Sum
 # Create your views here.
 
 def opens(request):
@@ -19,6 +22,29 @@ title_dic = None
 weight_dict = None
 id2idx = None
 
+def load_baseline():
+    with open('data/edge_query_dict.json', 'r') as f:
+        edge_query_dict = json.load(f)
+    with open('data/id2idx.json', 'r') as f:
+        id2idx = json.load(f)
+    return edge_query_dict, id2idx
+
+def query_weight(id_i, id_j, weight: dict, id2idx: dict) -> list:
+    idx_i, idx_j = id2idx[id_i], id2idx[id_j]
+    key = str(idx_i) + '_' + str(idx_j)
+    queried_results = weight[key]
+    return queried_results
+
+def sigmoid(x):
+    return 1 / (1 + math.exp(-x))
+
+
+def compute_score(cross_feature, n_citation):
+    impact = sigmoid(n_citation / 10)
+    score = cross_feature * impact
+    return score
+
+'''
 def load_baseline():
     weight = sp.load_npz('data/baseline.npz')
     with open('data/id2idx.json', 'r') as f:
@@ -37,49 +63,75 @@ def query_weight(id_i, id_j, weight: sp.csr_matrix, id2idx) -> float:
         return value
     except:
         return 0.1
+
+def generate_database(request):
+    global node_dict,citation_dict,author_dict,kw_dic,title_dic,weight_dict,id2idx
+    init_data()
+    auts = [Author(name = aut) for aut in tqdm(author_dict)]
+    Author.objects.bulk_create(auts)
+    papers = []
+    refs = []
+    for idx in tqdm(node_dict):
+        nd = node_dict[idx]
+        g = gen_graph(idx)
+        paper = Paper(idx = int(idx), title = nd['title'][:200], venue = nd['venue'][:300],year = nd['year'],citation = nd['citation'],abstract = nd['abstract'],keywords = ';'.join(nd['keywords'][:5]),authors = ';'.join(nd['authors'][:3]))
+        for nb in g.nodes:
+            neb = g.nodes[nb]
+            if neb['modularity_class'] != 'self':
+                nbr = Edge(uid = int(idx),vid = int(nb),relevance = neb['relevance'],impact = neb['impact'],score = neb['score'],relation = neb['modularity_class'],title = neb['label'][:200])
+                refs.append(nbr)
+        papers.append(paper)
+    Paper.objects.bulk_create(papers)
+    Edge.objects.bulk_create(refs)
+    return HttpResponse('init over!')
+
+'''
     
 def init_data():
-    global node_dict,citation_dict,author_dict,kw_dic,title_dic,weight_dict,id2idx
-    if node_dict == None:
-        with open('data/processed_data.pkl','rb') as f:
-            node_dict,citation_dict,author_dict,kw_dic,title_dic = pickle.load(f)
-        weight_dict,id2idx = load_baseline()
+    return
+'''
+    global kw_dic,title_dic
+    if kw_dic == None:
+        print('init start')
+        with open('data/keywords.pkl','rb') as f:
+            kw_dic,title_dic = pickle.load(f)
+        print('init over')
+'''
 
 def get_value(id_i,id_j):
-    # return np.random.rand()
-    ans = query_weight(id_i,id_j,weight_dict,id2idx)
-    ans = float(ans)
-    # ans = 1.0
-    return ans
+    try:
+        ans = query_weight(id_i,id_j,weight_dict,id2idx)
+        ans[2] = compute_score(ans[0],ans[1])
+        return tuple(ans)
+    except:
+        ans = [0,node_dict[id_j]['citation'],0]
+        ans[2] = compute_score(ans[0],ans[1])
+        return tuple(ans)
 
 def gen_graph(index):
     index = str(index)
     g = nx.DiGraph()
-    root_name = node_dict[index]['title']
-    g.add_node(index,label = root_name,value = 1.0,modularity_class = 'self')
-    nb_list = []
-    for nd in node_dict[index]['references']:
-        nb_list.append((nd,get_value(index,nd),'references'))
-    for nd in citation_dict.get(index,[]):
-        nb_list.append((nd,get_value(index,nd),'cited'))
-    nb_list.sort(key = lambda x:x[1],reverse = True)
-    nb_list = list(filter(lambda x:x[1]>0.0,nb_list))[:10]
-    if len(nb_list) > 0:
-        val_max = nb_list[0][1]
-        for nd,val,clas in nb_list:
-            g.add_node(nd,label = node_dict[nd]['title'],value = val/val_max, modularity_class = clas)
-            g.add_edge(nd,index,weight = val/val_max)
-    for aut in node_dict[index]['authors']:
-        for nd in author_dict[aut]:
-            if nd not in g.nodes and len(g.nodes)<15:
-                g.add_node(nd,label = node_dict[nd]['title'],value = 0.4, modularity_class = 'co-author')
-                g.add_edge(nd,index,weight = 0.4)
-                
+    node = Paper.objects.get(idx = int(index))
+    neighbors = Edge.objects.filter(uid = int(index))
+    root_name = node.title
+    g.add_node(index,label = root_name,showValue = 1.5,relevance = 1.0, impact = node.citation, score = 1.0,modularity_class = 'self')
+    nb_list = [_ for _ in neighbors if _.relation!='co-author']
+    co_list = [_ for _ in neighbors if _.relation=='co-author']
+    if len(nb_list)>0:
+        nb_max = np.max([_.score for _ in nb_list])
+    if len(co_list)>0:
+        co_max = np.max([_.score for _ in co_list])
+    for nd in nb_list:
+        showValue,relevance,impact,score = 0.5*nd.score/nb_max+0.7,nd.relevance,nd.impact,nd.score
+        g.add_node(str(nd.vid),label = nd.title,showValue = showValue,relevance = relevance, impact = impact, score = score, modularity_class = nd.relation)
+        g.add_edge(str(nd.vid),index,weight = showValue)
+    for nd in co_list:
+        showValue,relevance,impact,score = 0.4*nd.score/co_max+0.3,nd.relevance,nd.impact,nd.score
+        g.add_node(str(nd.vid),label = nd.title,showValue = showValue,relevance = relevance, impact = impact, score = score, modularity_class = nd.relation)
+        g.add_edge(str(nd.vid),index,weight = showValue)
     return g
 
 def getgexf(request,index):
-    global node_dict,citation_dict,author_dict,weight_dict,id2idx
-    init_data()
     file_path = 'data/graphs/' + str(index) + '.gexf'
     graph = gen_graph(int(index))
     # nx.write_gexf(graph,file_path)
@@ -97,30 +149,50 @@ def getgexf(request,index):
     return JsonResponse(graph_dict)
 
 def get_message(idx:str):
-    global node_dict
-    init_data()
-    return node_dict[idx].copy()
+    node = {}
+    nd = Paper.objects.get(idx = int(idx))
+    node['idx'] = str(nd.idx)
+    node['title'] = nd.title
+    node['year'] = nd.year
+    node['venue'] = nd.venue
+    node['abstract'] = nd.abstract
+    node['keywords'] = nd.keywords.split(';')
+    node['authors'] = nd.authors.split(';')
+    node['citation'] = nd.citation
+    return node
+
+def get_messages(idxs:list):
+    idxs = [int(idx) for idx in idxs]
+    nds = Paper.objects.filter(idx__in = idxs)
+    papers = []
+    for nd in nds:
+        node = {}
+        node['idx'] = str(nd.idx)
+        node['title'] = nd.title
+        node['year'] = nd.year
+        node['venue'] = nd.venue
+        node['abstract'] = nd.abstract
+        node['keywords'] = nd.keywords.split(';')
+        node['authors'] = nd.authors.split(';')
+        node['citation'] = nd.citation
+        papers.append(node)
+    return papers
 
 def search_paper(sentence:str):
-    global title_dic,kw_dic
-    init_data()
+    # global title_dic,kw_dic
+    # init_data()
     sentence.replace('%20',' ').replace(':',' ')
-    sentence = sentence.lower().strip()
     ans_dic = {}
-    if sentence in title_dic:
-        ans_dic[title_dic[sentence]] = 10.0
+    sentence = sentence.strip()
+    possible_kw = [sentence]
+    sentence = sentence.lower()
     sentence = sentence.split(' ')
     for st in range(len(sentence)):
         for ed in range(st+1,len(sentence)+1):
             kw = ' '.join(sentence[st:ed])
-            if kw in kw_dic:
-                for idx,weight in kw_dic[kw]:
-                    if idx not in ans_dic:
-                        ans_dic[idx] = 0
-                    ans_dic[idx] += weight
-    for idx in ans_dic:
-        ans_dic[idx] *= node_dict[idx]['citation']
-    return sorted(ans_dic.items(),key = lambda x:x[1],reverse = True)
+            possible_kw.append(kw)
+    ans = Keyword.objects.filter(keyword__in = possible_kw).values('idx').annotate(val = Sum('score')).order_by('-val')
+    return [_['idx'] for _ in ans]
 
 
 def writegraph(request,index):
@@ -142,50 +214,48 @@ class pagen:
         self.num=n
         
 def search_papers(request,keywords,page):
-    try:
-        page = int(page)
-        paper_ids = search_paper(keywords)
-        paper_ids = [ans[0] for ans in paper_ids]
-        pagenum = int(np.ceil(len(paper_ids)/10))
-        assert(page <= pagenum)
-        render_dict = {}
-        render_dict['messages'] = "About "+str(len(paper_ids))+" results, "+str(pagenum)+" pages"
-        aforp=[]
-        lef=max(1,page-5)
-        rig=min(pagenum+1,page+6)
-        if lef!=1:
-            aforp.append(pagen(True,"searchfor"+keywords+"page1","1"))
-        if lef>2:
-            aforp.append(pagen(False,"","..."))
-        for i in range(lef,rig):
-            if i==page:
-                aforp.append(pagen(False,"",str(i)))
-            else:
-                aforp.append(pagen(True,"searchfor"+keywords+"page"+str(i),str(i)))
-        if rig<pagenum:
-            aforp.append(pagen(False,"","..."))
-        if rig<=pagenum:
-            aforp.append(pagen(True,"searchfor"+keywords+"page"+str(pagenum),str(pagenum)))
-        render_dict['pas'] = aforp
-        paper_ids = paper_ids[(page-1)*10:page*10]
-        papers = []
-        for idx in paper_ids:
-            paper = get_message(idx)
-            paper['website'] = 'graph_' + idx
-            venue = paper['venue'].split(' ')
-            if len(venue)>3:
-                venue = venue[:3] + ['...']
-            paper['venue'] = ' '.join(venue)
-            abstract = paper['abstract'].split(' ')
-            if len(abstract)>30:
-                abstract = abstract[:30] + ['...']
-            paper['abstract'] = ' '.join(abstract)
-            if paper['venue'] == '':
-                paper['other_message'] = ','.join(paper['authors'][:4])+' '+str(paper['year'])
-            else:
-                paper['other_message'] = ','.join(paper['authors'][:3])+' -'+paper['venue']+','+str(paper['year'])
-            papers.append(paper)
-        render_dict['answers'] = papers
-        return render(request,'search.html',render_dict)
+    page = int(page)
+    paper_ids = search_paper(keywords)
+    pagenum = int(np.ceil(len(paper_ids)/10))
+    assert(page <= pagenum)
+    render_dict = {}
+    render_dict['messages'] = "About "+str(len(paper_ids))+" results, "+str(pagenum)+" pages"
+    aforp=[]
+    lef=max(1,page-5)
+    rig=min(pagenum+1,page+6)
+    if lef!=1:
+        aforp.append(pagen(True,"searchfor"+keywords+"page1","1"))
+    if lef>2:
+        aforp.append(pagen(False,"","..."))
+    for i in range(lef,rig):
+        if i==page:
+            aforp.append(pagen(False,"",str(i)))
+        else:
+            aforp.append(pagen(True,"searchfor"+keywords+"page"+str(i),str(i)))
+    if rig<pagenum:
+        aforp.append(pagen(False,"","..."))
+    if rig<=pagenum:
+        aforp.append(pagen(True,"searchfor"+keywords+"page"+str(pagenum),str(pagenum)))
+    render_dict['pas'] = aforp
+    paper_ids = paper_ids[(page-1)*10:page*10]
+    papers = get_messages(paper_ids)
+    for paper in papers:
+        paper['website'] = 'graph_' + paper['idx']
+        venue = paper['venue'].split(' ')
+        if len(venue)>3:
+            venue = venue[:3] + ['...']
+        paper['venue'] = ' '.join(venue)
+        abstract = paper['abstract'].split(' ')
+        if len(abstract)>30:
+            abstract = abstract[:30] + ['...']
+        paper['abstract'] = ' '.join(abstract)
+        if paper['venue'] == '':
+            paper['other_message'] = ','.join(paper['authors'][:4])+' '+str(paper['year'])
+        else:
+            paper['other_message'] = ','.join(paper['authors'][:3])+' -'+paper['venue']+','+str(paper['year'])
+    render_dict['answers'] = papers
+    return render(request,'search.html',render_dict)
+    '''
     except:
         return render(request,'start.html')
+   '''

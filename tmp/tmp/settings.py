@@ -25,7 +25,7 @@ SECRET_KEY = 'mtxpaoo-v!4j8=k90x^dihdklo-(bibh+l^h1(tothw8n!u7o+'
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = ['gpu3']
+ALLOWED_HOSTS = ['gpu3','182.92.215.138','citation.plus','127.0.0.1']
 
 
 # Application definition
