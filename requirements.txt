@@ -4,7 +4,7 @@ decorator==4.4.2
 Django==3.0.4
 joblib==0.14.1
 networkx==2.2
-numpy==1.18.1
+numpy==1.22.0
 pytz==2019.3
 scikit-learn==0.22.2.post1
 scipy==1.4.1
